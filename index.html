@@ -171,7 +171,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
   box-shadow: 0 0 18px color-mix(in oklab, var(--web-blue) 35%, transparent); transition: transform .15s; }
 .voice-btn:active { transform: scale(.97); }
 .voice-btn:focus-visible { outline: 2px solid var(--foreground); outline-offset: 3px; }
-#confirmed { top: 72%; }
+#confirmed { top: 78%; }
 
 /* aranhinha que desce pelo fio na tela da data */
 @keyframes dangle-in { 0% { transform: translateY(-115%); } 100% { transform: translateY(0); } }
@@ -255,7 +255,6 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
       <a data-quick="map" target="_blank" rel="noopener">Ver no mapa</a>
       <a data-quick="cal" target="_blank" rel="noopener">Salvar na agenda</a>
     </div>
-    <button id="retryWa" class="retry reveal-up" type="button" style="animation-delay:4100ms">Não abriu o WhatsApp? Toque aqui</button>
   </section>
   <button id="restartBtn" class="nav-btn" type="button" aria-label="Ver convite novamente" hidden><span>← VER CONVITE NOVAMENTE</span></button>
 </main>
@@ -498,8 +497,6 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
     btn.addEventListener("keydown", function (e) { e.stopPropagation(); });
   }
   [el.back, el.next, el.restart].forEach(isolate);
-  var retry = $("retryWa"); isolate(retry);
-  retry.addEventListener("click", function () { openWhatsApp(); });
 
   // Voz do Arthur: só toca quando a pessoa toca no botão 
   var voice = $("arthurVoice"), vbtn = $("voiceBtn");
@@ -616,7 +613,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
     var pull = reduceMotion ? 0 : cs.pull, TP = cs.touch, reach = R * .85;
 
     // inclinação 3D da teia: rotação leve do plano com perspectiva (só depois da abertura, para não mexer na aranha)
-    var tiltT = reduceMotion ? 0 : clamp01((t - T.webFade) / 700);
+    var tiltT = (reduceMotion || heart) ? 0 : clamp01((t - T.webFade) / 700);
     var kk = 1 - Math.exp(-dt * 6);
     cs.ay += ((cs.hx + cs.gx) - cs.ay) * kk; cs.ax += ((cs.hy + cs.gy) - cs.ax) * kk;
     var tAy = (cs.ay + .09 * Math.sin(now / 1900)) * tiltT, tAx = (cs.ax + .06 * Math.sin(now / 2600 + 1)) * tiltT;
@@ -638,8 +635,8 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 
     var openBoost = heart ? 1 : 1 + .45 * (1 - clamp01((t - T.end) / 700));
     var settled = clamp01((t - T.webFade) / 520);
-    var webFadeK = 1 - settled * (heart ? .78 : .08);
-    var afterK = heart ? 1 : 1 + settled * .35;
+    var webFadeK = 1 - settled * (heart ? .3 : .08);
+    var afterK = 1 + settled * .35;
     var pulseProgress = cs.pulseAt === null ? 1 : clamp01((now - cs.pulseAt) / 520);
     var pulseAlpha = heart ? 0 : Math.sin(Math.PI * pulseProgress) * .3;
 
@@ -753,12 +750,18 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
       ctx.globalAlpha = 1;
     }
 
-    // 3b. coração traçado por um fio da teia (tela final)
+    // 3b. coração traçado por um fio da teia (tela final): depois de pronto, bate como um coração e solta faíscas
     if (heart && t > T.webFade) {
       var hp = easeInOut(clamp01((t - T.webFade) / 900));
       var k = R / 30, N = 120;
-      ctx.save(); ctx.translate(cx, cy);
-      ctx.strokeStyle = RED; ctx.lineWidth = 1.8; ctx.shadowBlur = 14; ctx.shadowColor = RED; ctx.globalAlpha = .95;
+      var ftb = t - T.webFade - 900, fpulse = 0;
+      if (hp >= 1 && ftb > 0 && !reduceMotion) {
+        var fpp = (ftb / 1500) % 1;
+        fpulse = Math.exp(-Math.pow((fpp - .08) / .05, 2)) + .6 * Math.exp(-Math.pow((fpp - .28) / .06, 2));
+      }
+      var fbeat = 1 + .045 * fpulse;
+      ctx.save(); ctx.translate(cx, cy); ctx.scale(fbeat, fbeat); ctx.translate(0, -3.2 * k);
+      ctx.strokeStyle = RED; ctx.lineWidth = 1.8; ctx.shadowBlur = 14 + 12 * fpulse; ctx.shadowColor = RED; ctx.globalAlpha = .95;
       ctx.beginPath();
       var lx = 0, ly = 0;
       for (var i = 0; i <= N * hp; i++) {
@@ -770,7 +773,8 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
       }
       ctx.stroke();
       if (hp < 1) { ctx.fillStyle = RED; ctx.beginPath(); ctx.arc(lx, ly, 1.8, 0, Math.PI * 2); ctx.fill(); }
-      ctx.restore(); ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+      ctx.restore();
+      ctx.globalAlpha = 1; ctx.shadowBlur = 0;
     }
 
     // 3. corpo da aranha desenhado pelos mesmos fios
